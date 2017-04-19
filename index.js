@@ -6,15 +6,18 @@ let BigInteger = require('bigi')
 let ecurve = require('ecurve')
 let curve = ecurve.getCurveByName('secp256k1')
 
+function BIP32Path (value) {
+  return typeforce.String(value) && value.match(/^(m\/)?(\d+'?\/)*\d+'?$/)
+}
+BIP32Path.toJSON = function () { return 'BIP32 derivation path' }
+
 let UINT31_MAX = Math.pow(2, 31) - 1
 function UInt31 (value) {
   return typeforce.UInt32(value) && value <= UINT31_MAX
 }
 
-function BIP32Path (value) {
-  return typeforce.String(value) && value.match(/^(m\/)?(\d+'?\/)*\d+'?$/)
-}
-BIP32Path.toJSON = function () { return 'BIP32 derivation path' }
+let HARDENED_BIT = 0x80000000
+let MASTER_SECRET = Buffer.from('Bitcoin seed', 'utf8')
 
 function Node (d, Q, chainCode) {
   typeforce(typeforce.tuple(
@@ -31,86 +34,11 @@ function Node (d, Q, chainCode) {
   this.parentFingerprint = 0x00000000
 }
 
-Node.HIGHEST_BIT = 0x80000000
-Node.LENGTH = 78
-Node.MASTER_SECRET = Buffer.from('Bitcoin seed', 'utf8')
-
-// TODO
-// Node.prototype.getAddress = function () {
-//   return this.keyPair.getAddress()
-// }
-
-Node.prototype.getIdentifier = function () {
-  let h = createHash('rmd160').update(this.keyPair.Q).digest()
-  return createHash('sha256').update(h).digest()
-}
-
-Node.prototype.getFingerprint = function () {
-  return this.getIdentifier().slice(0, 4)
-}
-
-Node.prototype.neutered = function () {
-  let neuteredKeyPair = { Q: this.keyPair.Q }
-  let neutered = new Node(neuteredKeyPair, this.chainCode)
-  neutered.depth = this.depth
-  neutered.index = this.index
-  neutered.parentFingerprint = this.parentFingerprint
-
-  return neutered
-}
-
-// TODO
-// Node.prototype.sign = function (hash) {
-//   return this.keyPair.sign(hash)
-// }
-// Node.prototype.verify = function (hash, signature) {
-//   return this.keyPair.verify(hash, signature)
-// }
-
-Node.prototype.getPublicKey = function () {
-  return this.keyPair.Q
-}
-
-Node.prototype.toBase58 = function (bip32Constants) {
-  let version = (!this.isNeutered()) ? bip32Constants.private : bip32Constants.public
-  let buffer = Buffer.allocUnsafe(78)
-
-  // 4 bytes: version bytes
-  buffer.writeUInt32BE(version, 0)
-
-  // 1 byte: depth: 0x00 for master nodes, 0x01 for level-1 descendants, ....
-  buffer.writeUInt8(this.depth, 4)
-
-  // 4 bytes: the fingerprint of the parent's key (0x00000000 if master key)
-  buffer.writeUInt32BE(this.parentFingerprint, 5)
-
-  // 4 bytes: child number. This is the number i in xi = xpar/i, with xi the key being serialized.
-  // This is encoded in big endian. (0x00000000 if master key)
-  buffer.writeUInt32BE(this.index, 9)
-
-  // 32 bytes: the chain code
-  this.chainCode.copy(buffer, 13)
-
-  // 33 bytes: the [padded] private key, or
-  if (!this.isNeutered()) {
-    // 0x00 + k for private keys
-    buffer.writeUInt8(0, 45)
-    this.keyPair.d.copy(buffer, 46)
-
-  // 33 bytes: the public key
-  } else {
-    // X9.62 encoding for public keys
-    this.keyPair.Q.copy(buffer, 45)
-  }
-
-  return base58check.encode(buffer)
-}
-
 // https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki#child-key-derivation-ckd-functions
 Node.prototype.derive = function (index) {
   typeforce(typeforce.UInt32, index)
 
-  let isHardened = index >= Node.HIGHEST_BIT
+  let isHardened = index >= HARDENED_BIT
   let data = Buffer.allocUnsafe(37)
 
   // Hardened child
@@ -174,13 +102,7 @@ Node.prototype.deriveHardened = function (index) {
   typeforce(UInt31, index)
 
   // Only derives hardened private keys by default
-  return this.derive(index + Node.HIGHEST_BIT)
-}
-
-// Private === not neutered
-// Public === neutered
-Node.prototype.isNeutered = function () {
-  return !(this.keyPair.d)
+  return this.derive(index + HARDENED_BIT)
 }
 
 Node.prototype.derivePath = function (path) {
@@ -205,13 +127,88 @@ Node.prototype.derivePath = function (path) {
   }, this)
 }
 
+// TODO
+// Node.prototype.getAddress = function () {
+//   return this.keyPair.getAddress()
+// }
+// Node.prototype.sign = function (hash) {
+//   return this.keyPair.sign(hash)
+// }
+// Node.prototype.verify = function (hash, signature) {
+//   return this.keyPair.verify(hash, signature)
+// }
+
+Node.prototype.getIdentifier = function () {
+  let h = createHash('rmd160').update(this.keyPair.Q).digest()
+  return createHash('sha256').update(h).digest()
+}
+
+Node.prototype.getFingerprint = function () {
+  return this.getIdentifier().slice(0, 4)
+}
+
+Node.prototype.getPublicKey = function () {
+  return this.keyPair.Q
+}
+
+// Private === not neutered
+// Public === neutered
+Node.prototype.isNeutered = function () {
+  return !(this.keyPair.d)
+}
+
+Node.prototype.neutered = function () {
+  let neuteredKeyPair = { Q: this.keyPair.Q }
+  let neutered = new Node(neuteredKeyPair, this.chainCode)
+  neutered.depth = this.depth
+  neutered.index = this.index
+  neutered.parentFingerprint = this.parentFingerprint
+
+  return neutered
+}
+
+Node.prototype.toBase58 = function (bip32Constants) {
+  let version = (!this.isNeutered()) ? bip32Constants.private : bip32Constants.public
+  let buffer = Buffer.allocUnsafe(78)
+
+  // 4 bytes: version bytes
+  buffer.writeUInt32BE(version, 0)
+
+  // 1 byte: depth: 0x00 for master nodes, 0x01 for level-1 descendants, ....
+  buffer.writeUInt8(this.depth, 4)
+
+  // 4 bytes: the fingerprint of the parent's key (0x00000000 if master key)
+  buffer.writeUInt32BE(this.parentFingerprint, 5)
+
+  // 4 bytes: child number. This is the number i in xi = xpar/i, with xi the key being serialized.
+  // This is encoded in big endian. (0x00000000 if master key)
+  buffer.writeUInt32BE(this.index, 9)
+
+  // 32 bytes: the chain code
+  this.chainCode.copy(buffer, 13)
+
+  // 33 bytes: the [padded] private key, or
+  if (!this.isNeutered()) {
+    // 0x00 + k for private keys
+    buffer.writeUInt8(0, 45)
+    this.keyPair.d.copy(buffer, 46)
+
+  // 33 bytes: the public key
+  } else {
+    // X9.62 encoding for public keys
+    this.keyPair.Q.copy(buffer, 45)
+  }
+
+  return base58check.encode(buffer)
+}
+
 function fromSeed (seed) {
   typeforce(typeforce.oneOf(typeforce.BufferN(16), typeforce.BufferN(32)), seed)
 
   if (seed.length < 16) throw new TypeError('Seed should be at least 128 bits')
   if (seed.length > 64) throw new TypeError('Seed should be at most 512 bits')
 
-  let I = createHmac('sha512', Node.MASTER_SECRET).update(seed).digest()
+  let I = createHmac('sha512', MASTER_SECRET).update(seed).digest()
   let IL = I.slice(0, 32)
   let IR = I.slice(32)
   let pIL = BigInteger.fromBuffer(IL)
