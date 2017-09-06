@@ -112,7 +112,7 @@ Node.prototype.derivePath = function (path) {
   if (splitPath[0] === 'm') {
     if (this.parentFingerprint) throw new Error('Not a master node')
 
-    splitPath = splitPath.slice(1)
+    splitPath.shift()
   }
 
   return splitPath.reduce(function (prevHd, indexStr) {
@@ -126,17 +126,6 @@ Node.prototype.derivePath = function (path) {
     }
   }, this)
 }
-
-// TODO
-// Node.prototype.getAddress = function () {
-//   return this.keyPair.getAddress()
-// }
-// Node.prototype.sign = function (hash) {
-//   return this.keyPair.sign(hash)
-// }
-// Node.prototype.verify = function (hash, signature) {
-//   return this.keyPair.verify(hash, signature)
-// }
 
 Node.prototype.getIdentifier = function () {
   let h = createHash('rmd160').update(this.keyPair.Q).digest()
