@@ -56,16 +56,11 @@ function pointVerifyCompressed (q) {
 }
 
 function ecdsaSign (hash, d) {
-  if (!intVerify(d)) throw new TypeError('Expected UInt256, got ' + d)
-
   var result = secp256k1.sign(hash, d)
   return result && result.signature
 }
 
 function ecdsaVerify (hash, signature, Q) {
-  if (!Buffer.isBuffer(hash)) throw new TypeError('Expected Buffer')
-  if (!Buffer.isBuffer(signature)) throw new TypeError('Expected Buffer')
-
   return secp256k1.verify(hash, signature, Q)
 }
 
