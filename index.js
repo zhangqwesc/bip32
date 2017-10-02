@@ -2,22 +2,20 @@ var Buffer = require('safe-buffer').Buffer
 var base58check = require('bs58check')
 var createHash = require('create-hash')
 var createHmac = require('create-hmac')
-var typeforce = require('typeforce')
 var ecc = require('./ecc')
+var typeforce = require('typeforce')
+var wif = require('wif')
 
 var NETWORK_TYPE = typeforce.compile({
+  wif: typeforce.UInt8,
   bip32: {
     public: typeforce.UInt32,
     private: typeforce.UInt32
   }
 })
 
-var UINT31_MAX = Math.pow(2, 31) - 1
-function UInt31 (value) {
-  return typeforce.UInt32(value) && value <= UINT31_MAX
-}
-
-var DEFAULT_NETWORK = {
+var BITCOIN = {
+  wif: 0x80,
   bip32: {
     public: 0x0488b21e,
     private: 0x0488ade4
@@ -39,7 +37,7 @@ function fromSeed (seed, network) {
   if (seed.length < 16) throw new TypeError('Seed should be at least 128 bits')
   if (seed.length > 64) throw new TypeError('Seed should be at most 512 bits')
   if (network) typeforce(NETWORK_TYPE, network)
-  network = network || DEFAULT_NETWORK
+  network = network || BITCOIN
 
   var I = createHmac('sha512', 'Bitcoin seed').update(seed).digest()
   var IL = I.slice(0, 32)
@@ -55,7 +53,7 @@ function fromBase58 (string, network) {
   var buffer = base58check.decode(string)
   if (buffer.length !== 78) throw new Error('Invalid buffer length')
   if (network) typeforce(NETWORK_TYPE, network)
-  network = network || DEFAULT_NETWORK
+  network = network || BITCOIN
 
   // 4 bytes: version bytes
   var version = buffer.readUInt32BE(0)
@@ -124,16 +122,15 @@ BIP32.prototype.getNetwork = function () {
   return this.network
 }
 
-BIP32.prototype.getPublicKeyBuffer = function () {
+BIP32.prototype.getPublicKey = function () {
   return this.Q
 }
 
 BIP32.prototype.neutered = function () {
-  var neutered = new BIP32(null, this.Q, this.chainCode)
+  var neutered = new BIP32(null, this.Q, this.chainCode, this.network)
   neutered.depth = this.depth
   neutered.index = this.index
   neutered.parentFingerprint = this.parentFingerprint
-
   return neutered
 }
 
@@ -174,6 +171,11 @@ BIP32.prototype.toBase58 = function (__isPrivate) {
   }
 
   return base58check.encode(buffer)
+}
+
+BIP32.prototype.toWIF = function () {
+  if (!this.d) throw new TypeError('Missing private key')
+  return wif.encode(this.network.wif, this.d, true)
 }
 
 var HIGHEST_BIT = 0x80000000
@@ -224,7 +226,7 @@ BIP32.prototype.derive = function (index) {
   } else {
     // Ki = point(parse256(IL)) + Kpar
     //    = G*IL + Kpar
-    var Ki = ecc.pointAddTweak(this.Q, IL)
+    var Ki = ecc.pointAddTweak(this.Q, IL, true)
 
     // In case Ki is the point at infinity, proceed with the next value for i
     if (ecc.pointIsInfinity(Ki)) return this.derive(index + 1)
@@ -236,6 +238,11 @@ BIP32.prototype.derive = function (index) {
   hd.index = index
   hd.parentFingerprint = this.getFingerprint().readUInt32BE(0)
   return hd
+}
+
+var UINT31_MAX = Math.pow(2, 31) - 1
+function UInt31 (value) {
+  return typeforce.UInt32(value) && value <= UINT31_MAX
 }
 
 BIP32.prototype.deriveHardened = function (index) {
