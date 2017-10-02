@@ -21,75 +21,80 @@ fixtures.valid.forEach(function (f) {
 
 validAll.forEach(function (f) {
   tape.test(f.base58Priv, function (t) {
-    t.plan(18)
+    function verify (hd, prv) {
+      t.equal(hd.chainCode.toString('hex'), f.chainCode)
+      t.equal(hd.depth, f.depth >>> 0)
+      t.equal(hd.index, f.index >>> 0)
+      t.equal(hd.getFingerprint().toString('hex'), f.fingerprint)
+      t.equal(hd.getIdentifier().toString('hex'), f.identifier)
+      t.equal(hd.getPublicKey().toString('hex'), f.pubKey)
+      if (prv) t.equal(hd.toBase58(), f.base58Priv)
+      if (prv) t.equal(hd.toWIF(), f.wif)
+      if (!prv) t.throws(function () { hd.toWIF() }, /Missing private key/)
+      if (!prv) t.equal(hd.d, null) // internal
+      t.equal(hd.neutered().toBase58(), f.base58)
+      t.equal(hd.isNeutered(), !prv)
+    }
 
     var network
     if (f.network === 'litecoin') network = LITECOIN
     var hd = BIP32.fromBase58(f.base58Priv, network)
+    verify(hd, true)
 
-    t.equal(hd.chainCode.toString('hex'), f.chainCode)
-    t.equal(hd.depth, f.depth >>> 0)
-    t.equal(hd.index, f.index >>> 0)
-    t.equal(hd.getFingerprint().toString('hex'), f.fingerprint)
-    t.equal(hd.getIdentifier().toString('hex'), f.identifier)
-    t.equal(hd.getPublicKey().toString('hex'), f.pubKey)
-    t.equal(hd.toBase58(), f.base58Priv)
-    t.equal(hd.toWIF(), f.wif)
+    hd = BIP32.fromBase58(f.base58, network)
+    verify(hd, false)
 
-    var nhd = BIP32.fromBase58(f.base58Priv, network).neutered()
-    t.throws(function () { nhd.toWIF() }, /Missing private key/)
-    t.equal(nhd.chainCode.toString('hex'), f.chainCode)
-    t.equal(nhd.depth, f.depth >>> 0)
-    t.equal(nhd.index, f.index >>> 0)
-    t.equal(nhd.d, null) // internal
-    t.equal(nhd.getFingerprint().toString('hex'), f.fingerprint)
-    t.equal(nhd.getIdentifier().toString('hex'), f.identifier)
-    t.equal(nhd.getPublicKey().toString('hex'), f.pubKey)
-    t.equal(nhd.isNeutered(), true)
-    t.equal(nhd.toBase58(), f.base58)
+    if (f.seed) {
+      hd = BIP32.fromSeed(Buffer.from(f.seed, 'hex'), network)
+      verify(hd, true)
+    }
+
+    t.end()
   })
+})
+
+tape.test('fromBase58 throws', function (t) {
+  fixtures.invalid.fromBase58.forEach(function (f) {
+    t.throws(function () {
+      var network
+      if (f.network === 'litecoin') network = LITECOIN
+
+      BIP32.fromBase58(f.string, network)
+    }, new RegExp(f.exception))
+  })
+
+  t.end()
 })
 
 /*
 tape.test('fromSeed', function (t) {
-  fixtures.valid.forEach(function (f) {
-    var network
-    if (f.network === 'litecoin') network = LITECOIN
-    var hd = BIP32.fromSeed(Buffer.from(f.master.seed, 'hex'), network)
-
-    t.equal(hd.keyPair.toWIF(), f.master.wif)
-    t.equal(hd.chainCode.toString('hex'), f.master.chainCode)
-  })
-
-  tape.test('throws if IL is not within interval [1, n - 1] | IL === 0', function () {
+  t.throws(function () {
     this.mock(BigInteger).expects('fromBuffer')
       .once().returns(BigInteger.ZERO)
 
     t.throws(function () {
-      BIP32.fromSeedHex('ffffffffffffffffffffffffffffffff')
+      BIP32.fromSeed('ffffffffffffffffffffffffffffffff')
     }, /Private key must be greater than 0/)
-  })
+  }, /ErrorXXX/, 'throws if IL is not within interval [1, n - 1] | IL === 0')
 
-  tape.test('throws if IL is not within interval [1, n - 1] | IL === n', function () {
+'throws if IL is not within interval [1, n - 1] | IL === n'
     this.mock(BigInteger).expects('fromBuffer')
       .once().returns(curve.n)
 
     t.throws(function () {
       BIP32.fromSeedHex('ffffffffffffffffffffffffffffffff')
     }, /Private key must be less than the curve order/)
-  })
 
-  tape.test('throws on low entropy seed', function () {
+'throws on low entropy seed'
     t.throws(function () {
       BIP32.fromSeedHex('ffffffffff')
     }, /Seed should be at least 128 bits/)
-  })
 
-  tape.test('throws on too high entropy seed', function () {
+'throws on too high entropy seed'
     t.throws(function () {
       BIP32.fromSeedHex('ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff')
     }, /Seed should be at most 512 bits/)
-  })
+
 })
 
 tape.test('derive', function (t) {
@@ -233,50 +238,21 @@ tape.test('derive', function (t) {
   })
 })
 
-var hd = BIP32.fromSeed(Buffer.alloc(64))
-
-tape.test('sign', function () {
-  this.mock(keyPair).expects('sign')
-    .once().withArgs(hash).returns('signed')
-
-  t.equal(hd.sign(hash), 'signed')
-})
-
-tape.test('verify', function (t) {
-  var signature = hd.sign(hash)
-
-  this.mock(keyPair).expects('verify')
-    .once().withArgs(hash, signature).returns('verified')
-
-  t.equal(hd.verify(hash, signature), 'verified')
-})
-
-tape.test('fromBase58 / toBase58', function (t) {
-  validAll.forEach(function (f) {
-    tape.test('exports ' + f.base58 + ' (public) correctly', function () {
-      var hd = BIP32.fromBase58(f.base58, NETWORKS_LIST)
-
-      t.throws(function () { hd.keyPair.toWIF() }, /Missing private key/)
-    })
-  })
-
-  validAll.forEach(function (f) {
-    tape.test('exports ' + f.base58Priv + ' (private) correctly', function () {
-      var hd = BIP32.fromBase58(f.base58Priv, NETWORKS_LIST)
-
-      t.equal(hd.toBase58(), f.base58Priv)
-      t.equal(hd.keyPair.toWIF(), f.wif)
-    })
-  })
-
-  fixtures.invalid.fromBase58.forEach(function (f) {
-    tape.test('throws on ' + f.string, function () {
-      t.throws(function () {
-        var networks = f.network ? NETWORKS[f.network] : NETWORKS_LIST
-
-        BIP32.fromBase58(f.string, networks)
-      }, new RegExp(f.exception))
-    })
-  })
-})
+//  var hd = BIP32.fromSeed(Buffer.alloc(64))
+//
+//  tape.test('sign', function () {
+//    this.mock(keyPair).expects('sign')
+//      .once().withArgs(hash).returns('signed')
+//
+//    t.equal(hd.sign(hash), 'signed')
+//  })
+//
+//  tape.test('verify', function (t) {
+//    var signature = hd.sign(hash)
+//
+//    this.mock(keyPair).expects('verify')
+//      .once().withArgs(hash, signature).returns('verified')
+//
+//    t.equal(hd.verify(hash, signature), 'verified')
+//  })
 */

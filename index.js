@@ -92,7 +92,7 @@ function fromBase58 (string, network) {
     var X = buffer.slice(45, 78)
 
     // verify that the X coordinate in the public point corresponds to a point on the curve
-    if (!ecc.pointVerify(X)) throw new TypeError('Expected ECPoint')
+    if (!ecc.pointVerify(X)) throw new TypeError('Point is not on the curve')
     hd = new BIP32(null, X, chainCode, network)
   }
 
