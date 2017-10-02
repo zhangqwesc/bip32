@@ -20,14 +20,14 @@ fixtures.valid.forEach(function (f) {
 })
 
 validAll.forEach(function (f) {
-  tape.test('test', function (t) {
+  tape.test(f.base58Priv, function (t) {
     t.plan(18)
 
     var network
     if (f.network === 'litecoin') network = LITECOIN
     var hd = BIP32.fromBase58(f.base58Priv, network)
 
-    t.equal(hd.chainCode, hd.chainCode)
+    t.equal(hd.chainCode.toString('hex'), f.chainCode)
     t.equal(hd.depth, f.depth >>> 0)
     t.equal(hd.index, f.index >>> 0)
     t.equal(hd.getFingerprint().toString('hex'), f.fingerprint)
@@ -38,7 +38,7 @@ validAll.forEach(function (f) {
 
     var nhd = BIP32.fromBase58(f.base58Priv, network).neutered()
     t.throws(function () { nhd.toWIF() }, /Missing private key/)
-    t.equal(hd.chainCode, hd.chainCode)
+    t.equal(nhd.chainCode.toString('hex'), f.chainCode)
     t.equal(nhd.depth, f.depth >>> 0)
     t.equal(nhd.index, f.index >>> 0)
     t.equal(nhd.d, null) // internal
