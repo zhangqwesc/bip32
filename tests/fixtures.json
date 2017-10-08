@@ -179,6 +179,7 @@
       },
       "children": [
         {
+          "hardened": true,
           "path": "m/44'/0'/0'/0/0'",
           "wif": "L3z3MSqZtDQ1FPHKi7oWf1nc9rMEGFtZUDCoFa7n4F695g5qZiSu",
           "pubKey": "027c3591221e28939e45f8ea297d62c3640ebb09d7058b01d09c963d984a40ad49",
@@ -206,14 +207,15 @@
       },
       "children": [
         {
+          "hardened": true,
           "path": "m/44'/0'/0'/0/0'",
-          "wif": "L3z3MSqZtDQ1FPHKi7oWf1nc9rMEGFtZUDCoFa7n4F695g5qZiSu",
-          "pubKey": "027c3591221e28939e45f8ea297d62c3640ebb09d7058b01d09c963d984a40ad49",
-          "chainCode": "ca27553aa89617e982e621637d6478f564b32738f8bbe2e48d0a58a8e0f6da40",
-          "base58": "xpub6GcBnm7FfDg5ERWACCvtuotN6Tdoc37r3SZ1asBHvCWzPkqWn3MVKPWKzy6GsfmdMUGanR3D12dH1cp5tJauuubwc4FAJDn67SH2uUjwAT1",
-          "base58Priv": "xprvA3cqPFaMpr7n1wRh6BPtYfwdYRoKCaPzgDdQnUmgMrz1WxWNEW3EmbBr9ieh9BJAsRGKFPLvotb4p4Aq79jddUVKPVJt7exVzLHcv777JVf",
-          "identifier": "e371d69b5dae6eacee832a130ee9f55545275a09",
-          "fingerprint": "e371d69b",
+          "wif": "KxwPsTN9AdQ2CjGihVP8MnSadbtyByskCiX1GCEhjovKj4m3d7Xs",
+          "pubKey": "030e13168e3f9560da5cebca9c91b78280e7ffa221d097c6dac3e98f450355d6f6",
+          "chainCode": "7a16b2f4ad4cc1069338237f373dabf1fe329a5f3a0d95c4b98d061204676293",
+          "base58": "xpub6FqvhT2Bdh4YaWA3nqsNTaYNmCEXJnSJnBgntrH8GQVX8hf6exHusxyqgyd6kKKNTvtbpmNPGEH74VxJaAuo14NS52WBmWG9krq1ESqdR6T",
+          "base58Priv": "xprvA2raHwVHoKWFN25agpLN6SbeDAQ2uKiTQxmC6TsWi4xYFuKx7QyfLAfMqgvyXVr6fcDspooYFsas1ngymgmVSPjTCU5JRfwj6w4zukhfucS",
+          "identifier": "b2d8238bfeb71a89c8244b7e53105cd97021904e",
+          "fingerprint": "b2d8238b",
           "index": 2147483648,
           "depth": 5
         }

@@ -8,7 +8,7 @@ var EC_ZERO = Buffer.from('00000000000000000000000000000000000000000000000000000
 var EC_UINT_MAX = Buffer.from('fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141', 'hex')
 
 function intIsZero (a) {
-  return a.equal(EC_ZERO)
+  return a.equals(EC_ZERO)
 }
 
 function intVerify (value) {
@@ -29,7 +29,7 @@ function pointDerive (d, compressed) {
 
 function pointIsInfinity (q) {
   // return secp256k1_ge_is_infinity(q)
-  return pointVerify(q)
+  return !pointVerify(q)
 }
 
 function pointVerify (q) {

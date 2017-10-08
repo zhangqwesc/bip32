@@ -1,7 +1,7 @@
-var BIP32 = require('../')
-var tape = require('tape')
-var fixtures = require('./fixtures')
-var LITECOIN = {
+let BIP32 = require('../')
+let tape = require('tape')
+let fixtures = require('./fixtures')
+let LITECOIN = {
   wif: 0xb0,
   bip32: {
     public: 0x019da462,
@@ -9,9 +9,11 @@ var LITECOIN = {
   }
 }
 
-var validAll = []
+let validAll = []
 fixtures.valid.forEach(function (f) {
   f.master.network = f.network
+  f.master.children = f.children
+  f.master.comment = f.comment
   f.children.forEach(function (fc) {
     fc.network = f.network
     validAll.push(fc)
@@ -19,34 +21,68 @@ fixtures.valid.forEach(function (f) {
   validAll.push(f.master)
 })
 
-validAll.forEach(function (f) {
-  tape.test(f.base58Priv, function (t) {
-    function verify (hd, prv) {
-      t.equal(hd.chainCode.toString('hex'), f.chainCode)
-      t.equal(hd.depth, f.depth >>> 0)
-      t.equal(hd.index, f.index >>> 0)
-      t.equal(hd.getFingerprint().toString('hex'), f.fingerprint)
-      t.equal(hd.getIdentifier().toString('hex'), f.identifier)
-      t.equal(hd.getPublicKey().toString('hex'), f.pubKey)
-      if (prv) t.equal(hd.toBase58(), f.base58Priv)
-      if (prv) t.equal(hd.toWIF(), f.wif)
-      if (!prv) t.throws(function () { hd.toWIF() }, /Missing private key/)
-      if (!prv) t.equal(hd.d, null) // internal
-      t.equal(hd.neutered().toBase58(), f.base58)
-      t.equal(hd.isNeutered(), !prv)
+function verify (t, hd, prv, f, network) {
+  t.equal(hd.chainCode.toString('hex'), f.chainCode)
+  t.equal(hd.depth, f.depth >>> 0)
+  t.equal(hd.index, f.index >>> 0)
+  t.equal(hd.getFingerprint().toString('hex'), f.fingerprint)
+  t.equal(hd.getIdentifier().toString('hex'), f.identifier)
+  t.equal(hd.getPublicKey().toString('hex'), f.pubKey)
+  if (prv) t.equal(hd.toBase58(), f.base58Priv)
+  if (prv) t.equal(hd.toWIF(), f.wif)
+  if (!prv) t.throws(function () { hd.toWIF() }, /Missing private key/)
+  if (!prv) t.equal(hd.d, null) // internal
+  t.equal(hd.neutered().toBase58(), f.base58)
+  t.equal(hd.isNeutered(), !prv)
+
+  if (!f.children) return
+  if (!prv && f.children.some(x => x.hardened)) return
+
+  // test deriving path from master
+  f.children.forEach((cf) => {
+    let chd = hd.derivePath(cf.path)
+    verify(t, chd, prv, cf, network)
+
+    let chdNoM = hd.derivePath(cf.path.slice(2)) // no m/
+    verify(t, chdNoM, prv, cf, network)
+  })
+
+  // test deriving path from successive children
+  let shd = hd
+  f.children.forEach((cf) => {
+    if (cf.m === undefined) return
+    if (cf.hardened) {
+      shd = shd.deriveHardened(cf.m)
+    } else {
+      // verify any publicly derived children
+      if (cf.base58) verify(t, shd.neutered().derive(cf.m), false, cf, network)
+
+      shd = shd.derive(cf.m)
+      verify(t, shd, prv, cf, network)
     }
 
-    var network
-    if (f.network === 'litecoin') network = LITECOIN
-    var hd = BIP32.fromBase58(f.base58Priv, network)
-    verify(hd, true)
+    t.throws(function () {
+      shd.derivePath('m/0')
+    }, /Expected master, got child/)
 
-    hd = BIP32.fromBase58(f.base58, network)
-    verify(hd, false)
+    verify(t, shd, prv, cf, network)
+  })
+}
 
-    if (f.seed) {
-      hd = BIP32.fromSeed(Buffer.from(f.seed, 'hex'), network)
-      verify(hd, true)
+validAll.forEach(function (ff) {
+  tape.test(ff.comment || ff.base58Priv, function (t) {
+    let network
+    if (ff.network === 'litecoin') network = LITECOIN
+
+    let hd = BIP32.fromBase58(ff.base58Priv, network)
+    verify(t, hd, true, ff, network)
+
+    hd = BIP32.fromBase58(ff.base58, network)
+    verify(t, hd, false, ff, network)
+
+    if (ff.seed) {
+      hd = BIP32.fromSeed(Buffer.from(ff.seed, 'hex'), network)
+      verify(t, hd, true, ff, network)
     }
 
     t.end()
@@ -56,7 +92,7 @@ validAll.forEach(function (f) {
 tape.test('fromBase58 throws', function (t) {
   fixtures.invalid.fromBase58.forEach(function (f) {
     t.throws(function () {
-      var network
+      let network
       if (f.network === 'litecoin') network = LITECOIN
 
       BIP32.fromBase58(f.string, network)
@@ -64,6 +100,86 @@ tape.test('fromBase58 throws', function (t) {
   })
 
   t.end()
+})
+
+tape.test('works for Private -> public (neutered)', function (t) {
+  let f = fixtures.valid[1]
+  let c = f.children[0]
+
+  let master = BIP32.fromBase58(f.master.base58Priv)
+  let child = master.derive(c.m).neutered()
+
+  t.plan(1)
+  t.equal(child.toBase58(), c.base58)
+})
+
+tape.test('works for Private -> public (neutered, hardened)', function (t) {
+  let f = fixtures.valid[0]
+  let c = f.children[0]
+
+  let master = BIP32.fromBase58(f.master.base58Priv)
+  let child = master.deriveHardened(c.m).neutered()
+
+  t.plan(1)
+  t.equal(c.base58, child.toBase58())
+})
+
+tape.test('works for Public -> public', function (t) {
+  let f = fixtures.valid[1]
+  let c = f.children[0]
+
+  let master = BIP32.fromBase58(f.master.base58)
+  let child = master.derive(c.m)
+
+  t.plan(1)
+  t.equal(c.base58, child.toBase58())
+})
+
+tape.test('throws on Public -> public (hardened)', function (t) {
+  let f = fixtures.valid[0]
+  let c = f.children[0]
+
+  let master = BIP32.fromBase58(f.master.base58)
+
+  t.plan(1)
+  t.throws(function () {
+    master.deriveHardened(c.m)
+  }, /Missing private key for hardened child key/)
+})
+
+tape.test('throws on wrong types', function (t) {
+  let f = fixtures.valid[0]
+  let master = BIP32.fromBase58(f.master.base58)
+
+  fixtures.invalid.derive.forEach(function (fx) {
+    t.throws(function () {
+      master.derive(fx)
+    }, /Expected UInt32/)
+  })
+
+  fixtures.invalid.deriveHardened.forEach(function (fx) {
+    t.throws(function () {
+      master.deriveHardened(fx)
+    }, /Expected UInt31/)
+  })
+
+  fixtures.invalid.derivePath.forEach(function (fx) {
+    t.throws(function () {
+      master.derivePath(fx)
+    }, /Expected BIP32Path, got/)
+  })
+
+  t.end()
+})
+
+tape.test('works when private key has leading zeros', function (t) {
+  let key = 'xprv9s21ZrQH143K3ckY9DgU79uMTJkQRLdbCCVDh81SnxTgPzLLGax6uHeBULTtaEtcAvKjXfT7ZWtHzKjTpujMkUd9dDb8msDeAfnJxrgAYhr'
+  let hdkey = BIP32.fromBase58(key)
+
+  t.plan(2)
+  t.equal(hdkey.d.toString('hex'), '00000055378cf5fafb56c711c674143f9b0ee82ab0ba2924f19b64f5ae7cdbfd')
+  let child = hdkey.derivePath('m/44\'/0\'/0\'/0/0\'')
+  t.equal(child.d.toString('hex'), '3348069561d2a0fb925e74bf198762acc47dce7db27372257d2d959a9e6f8aeb')
 })
 
 /*
@@ -97,148 +213,7 @@ tape.test('fromSeed', function (t) {
 
 })
 
-tape.test('derive', function (t) {
-  function verifyVector (hd, v) {
-    if (hd.isNeutered()) {
-      t.equal(hd.toBase58(), v.base58)
-    } else {
-      t.equal(hd.neutered().toBase58(), v.base58)
-      t.equal(hd.toBase58(), v.base58Priv)
-    }
-
-    t.equal(hd.getFingerprint().toString('hex'), v.fingerprint)
-    t.equal(hd.getIdentifier().toString('hex'), v.identifier)
-    t.equal(hd.getAddress(), v.address)
-    t.equal(hd.keyPair.toWIF(), v.wif)
-    t.equal(hd.keyPair.getPublicKeyBuffer().toString('hex'), v.pubKey)
-    t.equal(hd.chainCode.toString('hex'), v.chainCode)
-    t.equal(hd.depth, v.depth >>> 0)
-    t.equal(hd.index, v.index >>> 0)
-  }
-
-  fixtures.valid.forEach(function (f) {
-    var network = NETWORKS[f.network]
-    var hd = BIP32.fromSeedHex(f.master.seed, network)
-    var master = hd
-
-    // testing deriving path from master
-    f.children.forEach(function (c) {
-      t.test(c.path + ' from ' + f.master.fingerprint + ' by path', function () {
-        var child = master.derivePath(c.path)
-        var childNoM = master.derivePath(c.path.slice(2)) // no m/ on path
-
-        verifyVector(child, c)
-        verifyVector(childNoM, c)
-      })
-    })
-
-    // testing deriving path from children
-    f.children.forEach(function (c, i) {
-      var cn = master.derivePath(c.path)
-
-      f.children.slice(i + 1).forEach(function (cc) {
-        t.test(cc.path + ' from ' + c.fingerprint + ' by path', function () {
-          var ipath = cc.path.slice(2).spltape.test('/').slice(i + 1).join('/')
-          var child = cn.derivePath(ipath)
-          verifyVector(child, cc)
-
-          t.throws(function () {
-            cn.derivePath('m/' + ipath)
-          }, /Not a master node/)
-        })
-      })
-    })
-
-    // FIXME: test data is only testing Private -> private for now
-    f.children.forEach(function (c) {
-      if (c.m === undefined) return
-
-      tape.test(c.path + ' from ' + f.master.fingerprint, function () {
-        if (c.hardened) {
-          hd = hd.deriveHardened(c.m)
-        } else {
-          hd = hd.derive(c.m)
-        }
-
-        verifyVector(hd, c)
-      })
-    })
-  })
-
-  tape.test('works for Private -> public (neutered)', function () {
-    var f = fixtures.valid[1]
-    var c = f.children[0]
-
-    var master = BIP32.fromBase58(f.master.base58Priv, NETWORKS_LIST)
-    var child = master.derive(c.m).neutered()
-
-    t.equal(child.toBase58(), c.base58)
-  })
-
-  tape.test('works for Private -> public (neutered, hardened)', function () {
-    var f = fixtures.valid[0]
-    var c = f.children[0]
-
-    var master = BIP32.fromBase58(f.master.base58Priv, NETWORKS_LIST)
-    var child = master.deriveHardened(c.m).neutered()
-
-    t.equal(c.base58, child.toBase58())
-  })
-
-  tape.test('works for Public -> public', function () {
-    var f = fixtures.valid[1]
-    var c = f.children[0]
-
-    var master = BIP32.fromBase58(f.master.base58, NETWORKS_LIST)
-    var child = master.derive(c.m)
-
-    t.equal(c.base58, child.toBase58())
-  })
-
-  tape.test('throws on Public -> public (hardened)', function () {
-    var f = fixtures.valid[0]
-    var c = f.children[0]
-
-    var master = BIP32.fromBase58(f.master.base58, NETWORKS_LIST)
-
-    t.throws(function () {
-      master.deriveHardened(c.m)
-    }, /Could not derive hardened child key/)
-  })
-
-  tape.test('throws on wrong types', function () {
-    var f = fixtures.valid[0]
-    var master = BIP32.fromBase58(f.master.base58, NETWORKS_LIST)
-
-    fixtures.invalid.derive.forEach(function (fx) {
-      t.throws(function () {
-        master.derive(fx)
-      }, /Expected UInt32/)
-    })
-
-    fixtures.invalid.deriveHardened.forEach(function (fx) {
-      t.throws(function () {
-        master.deriveHardened(fx)
-      }, /Expected UInt31/)
-    })
-
-    fixtures.invalid.derivePath.forEach(function (fx) {
-      t.throws(function () {
-        master.derivePath(fx)
-      }, /Expected BIP32 derivation path/)
-    })
-  })
-
-  tape.test('works when private key has leading zeros', function () {
-    var key = 'xprv9s21ZrQH143K3ckY9DgU79uMTJkQRLdbCCVDh81SnxTgPzLLGax6uHeBULTtaEtcAvKjXfT7ZWtHzKjTpujMkUd9dDb8msDeAfnJxrgAYhr'
-    var hdkey = BIP32.fromBase58(key)
-    t.equal(hdkey.keyPair.d.toBuffer(32).toString('hex'), '00000055378cf5fafb56c711c674143f9b0ee82ab0ba2924f19b64f5ae7cdbfd')
-    var child = hdkey.derivePath('m/44\'/0\'/0\'/0/0\'')
-    t.equal(child.keyPair.d.toBuffer().toString('hex'), '3348069561d2a0fb925e74bf198762acc47dce7db27372257d2d959a9e6f8aeb')
-  })
-})
-
-//  var hd = BIP32.fromSeed(Buffer.alloc(64))
+//  let hd = BIP32.fromSeed(Buffer.alloc(64))
 //
 //  tape.test('sign', function () {
 //    this.mock(keyPair).expects('sign')
@@ -248,7 +223,7 @@ tape.test('derive', function (t) {
 //  })
 //
 //  tape.test('verify', function (t) {
-//    var signature = hd.sign(hash)
+//    let signature = hd.sign(hash)
 //
 //    this.mock(keyPair).expects('verify')
 //      .once().withArgs(hash, signature).returns('verified')

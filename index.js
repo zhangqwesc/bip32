@@ -189,7 +189,7 @@ BIP32.prototype.derive = function (index) {
 
   // Hardened child
   if (isHardened) {
-    if (this.isNeutered()) throw new TypeError('Could not derive hardened child key')
+    if (this.isNeutered()) throw new TypeError('Missing private key for hardened child key')
 
     // data = 0x00 || ser256(kpar) || ser32(index)
     data[0] = 0x00
@@ -218,7 +218,7 @@ BIP32.prototype.derive = function (index) {
     var ki = ecc.intAdd(IL, this.d)
 
     // In case ki == 0, proceed with the next value for i
-    if (!ecc.intIsZero(ki)) return this.derive(index + 1)
+    if (ecc.intIsZero(ki)) return this.derive(index + 1)
 
     hd = new BIP32(ki, null, IR, this.network)
 
@@ -231,7 +231,7 @@ BIP32.prototype.derive = function (index) {
     // In case Ki is the point at infinity, proceed with the next value for i
     if (ecc.pointIsInfinity(Ki)) return this.derive(index + 1)
 
-    hd = new BIP32(null, Ki, this.network)
+    hd = new BIP32(null, Ki, IR, this.network)
   }
 
   hd.depth = this.depth + 1
@@ -267,7 +267,7 @@ BIP32.prototype.derivePath = function (path) {
 
   var splitPath = path.split('/')
   if (splitPath[0] === 'm') {
-    if (this.parentFingerprint) throw new Error('Expected master node, got child node')
+    if (this.parentFingerprint) throw new Error('Expected master, got child')
 
     splitPath = splitPath.slice(1)
   }
