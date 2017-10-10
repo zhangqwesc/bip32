@@ -92,7 +92,7 @@ function fromBase58 (string, network) {
     var X = buffer.slice(45, 78)
 
     // verify the X coordinate is a point on the curve
-    if (!ecc.pointVerify(X, true)) throw new TypeError('Point is not on the curve')
+    if (!ecc.pointVerify(X, true)) throw new Error('Point is not on the curve')
     hd = new BIP32(null, X, chainCode, network)
   }
 
