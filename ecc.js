@@ -52,8 +52,7 @@ function pointVerify (q, compressed) {
 }
 
 function ecdsaSign (hash, d) {
-  var result = secp256k1.sign(hash, d)
-  return result && result.signature
+  return secp256k1.sign(hash, d).signature
 }
 
 function ecdsaVerify (hash, signature, Q) {
