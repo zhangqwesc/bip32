@@ -20,19 +20,18 @@ function intVerify (value) {
 }
 
 function pointAddTweak (q, tweak, compressed) {
-  return secp256k1.publicKeyTweakAdd(q, tweak, compressed)
+  try {
+    return secp256k1.publicKeyTweakAdd(q, tweak, compressed)
+  } catch (e) {
+    return null
+  }
 }
 
 function pointDerive (d, compressed) {
   return secp256k1.publicKeyCreate(d, compressed)
 }
 
-function pointIsInfinity (q) {
-  // return secp256k1_ge_is_infinity(q)
-  return !pointVerify(q)
-}
-
-function pointVerify (q) {
+function pointVerify (q, compressed) {
   if (!Buffer.isBuffer(q)) return false
   if (q.length < 33) return false
 
@@ -43,16 +42,13 @@ function pointVerify (q) {
       break
     case 0x04:
       if (q.length !== 65) return false
+      if (compressed) return false
       break
     default:
       return false
   }
 
   return secp256k1.publicKeyVerify(q)
-}
-
-function pointVerifyCompressed (q) {
-  return pointVerify(q) && q.length === 33
 }
 
 function ecdsaSign (hash, d) {
@@ -70,9 +66,7 @@ module.exports = {
   intVerify: intVerify,
   pointAddTweak: pointAddTweak,
   pointDerive: pointDerive,
-  pointIsInfinity: pointIsInfinity,
   pointVerify: pointVerify,
-  pointVerifyCompressed: pointVerifyCompressed,
   ecdsaSign: ecdsaSign,
   ecdsaVerify: ecdsaVerify
 }

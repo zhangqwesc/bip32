@@ -91,8 +91,8 @@ function fromBase58 (string, network) {
   } else {
     var X = buffer.slice(45, 78)
 
-    // verify that the X coordinate in the public point corresponds to a point on the curve
-    if (!ecc.pointVerify(X)) throw new TypeError('Point is not on the curve')
+    // verify the X coordinate is a point on the curve
+    if (!ecc.pointVerify(X, true)) throw new TypeError('Point is not on the curve')
     hd = new BIP32(null, X, chainCode, network)
   }
 
@@ -229,7 +229,7 @@ BIP32.prototype.derive = function (index) {
     var Ki = ecc.pointAddTweak(this.Q, IL, true)
 
     // In case Ki is the point at infinity, proceed with the next value for i
-    if (ecc.pointIsInfinity(Ki)) return this.derive(index + 1)
+    if (Ki === null) return this.derive(index + 1)
 
     hd = new BIP32(null, Ki, IR, this.network)
   }
