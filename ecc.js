@@ -60,12 +60,12 @@ function ecdsaVerify (hash, signature, Q) {
 }
 
 module.exports = {
-  intAdd: intAdd,
-  intIsZero: intIsZero,
-  intVerify: intVerify,
-  pointAddTweak: pointAddTweak,
-  pointDerive: pointDerive,
-  pointVerify: pointVerify,
-  ecdsaSign: ecdsaSign,
-  ecdsaVerify: ecdsaVerify
+  intAdd,
+  intIsZero,
+  intVerify,
+  pointAddTweak,
+  pointDerive,
+  pointVerify,
+  ecdsaSign,
+  ecdsaVerify
 }

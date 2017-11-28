@@ -1,12 +1,12 @@
-var Buffer = require('safe-buffer').Buffer
-var base58check = require('bs58check')
-var createHash = require('create-hash')
-var createHmac = require('create-hmac')
-var ecc = require('./ecc')
-var typeforce = require('typeforce')
-var wif = require('wif')
+let Buffer = require('safe-buffer').Buffer
+let base58check = require('bs58check')
+let createHash = require('create-hash')
+let createHmac = require('create-hmac')
+let ecc = require('./ecc')
+let typeforce = require('typeforce')
+let wif = require('wif')
 
-var NETWORK_TYPE = typeforce.compile({
+let NETWORK_TYPE = typeforce.compile({
   wif: typeforce.UInt8,
   bip32: {
     public: typeforce.UInt32,
@@ -14,7 +14,7 @@ var NETWORK_TYPE = typeforce.compile({
   }
 })
 
-var BITCOIN = {
+let BITCOIN = {
   wif: 0x80,
   bip32: {
     public: 0x0488b21e,
@@ -25,6 +25,8 @@ var BITCOIN = {
 function BIP32 (d, Q, chainCode, network) {
   this.d = d || null
   this.Q = Q || ecc.pointDerive(d, true)
+  if (this.Q === null) throw new TypeError('Bad public key')
+
   this.chainCode = chainCode
   this.depth = 0
   this.index = 0
@@ -39,60 +41,60 @@ function fromSeed (seed, network) {
   if (network) typeforce(NETWORK_TYPE, network)
   network = network || BITCOIN
 
-  var I = createHmac('sha512', 'Bitcoin seed').update(seed).digest()
-  var IL = I.slice(0, 32)
-  var IR = I.slice(32)
+  let I = createHmac('sha512', 'Bitcoin seed').update(seed).digest()
+  let IL = I.slice(0, 32)
+  let IR = I.slice(32)
 
   // if IL is 0 or >= n, the master key is invalid
-  if (!ecc.intVerify(IL)) throw new Error('Private key not in range [1, n)')
+  if (!ecc.isPrivateKey(IL)) throw new TypeError('Private key not in range [1, n)')
 
   return new BIP32(IL, null, IR, network)
 }
 
 function fromBase58 (string, network) {
-  var buffer = base58check.decode(string)
-  if (buffer.length !== 78) throw new Error('Invalid buffer length')
+  let buffer = base58check.decode(string)
+  if (buffer.length !== 78) throw new TypeError('Invalid buffer length')
   if (network) typeforce(NETWORK_TYPE, network)
   network = network || BITCOIN
 
   // 4 bytes: version bytes
-  var version = buffer.readUInt32BE(0)
+  let version = buffer.readUInt32BE(0)
   if (version !== network.bip32.private &&
-    version !== network.bip32.public) throw new Error('Invalid network version')
+    version !== network.bip32.public) throw new TypeError('Invalid network version')
 
   // 1 byte: depth: 0x00 for master nodes, 0x01 for level-1 descendants, ...
-  var depth = buffer[4]
+  let depth = buffer[4]
 
   // 4 bytes: the fingerprint of the parent's key (0x00000000 if master key)
-  var parentFingerprint = buffer.readUInt32BE(5)
+  let parentFingerprint = buffer.readUInt32BE(5)
   if (depth === 0) {
-    if (parentFingerprint !== 0x00000000) throw new Error('Invalid parent fingerprint')
+    if (parentFingerprint !== 0x00000000) throw new TypeError('Invalid parent fingerprint')
   }
 
   // 4 bytes: child number. This is the number i in xi = xpar/i, with xi the key being serialized.
   // This is encoded in MSB order. (0x00000000 if master key)
-  var index = buffer.readUInt32BE(9)
-  if (depth === 0 && index !== 0) throw new Error('Invalid index')
+  let index = buffer.readUInt32BE(9)
+  if (depth === 0 && index !== 0) throw new TypeError('Invalid index')
 
   // 32 bytes: the chain code
-  var chainCode = buffer.slice(13, 45)
-  var hd
+  let chainCode = buffer.slice(13, 45)
+  let hd
 
   // 33 bytes: private key data (0x00 + k)
   if (version === network.bip32.private) {
-    if (buffer.readUInt8(45) !== 0x00) throw new Error('Invalid private key')
-    var k = buffer.slice(46, 78)
+    if (buffer.readUInt8(45) !== 0x00) throw new TypeError('Invalid private key')
+    let k = buffer.slice(46, 78)
 
     // if IL is 0 or >= n, the master key is invalid
-    if (!ecc.intVerify(k)) throw new Error('Private key not in range [1, n)')
+    if (!ecc.isPrivateKey(k)) throw new TypeError('Private key not in range [1, n)')
     hd = new BIP32(k, null, chainCode, network)
 
   // 33 bytes: public key data (0x02 + X or 0x03 + X)
   } else {
-    var X = buffer.slice(45, 78)
+    let X = buffer.slice(45, 78)
 
     // verify the X coordinate is a point on the curve
-    if (!ecc.pointVerify(X, true)) throw new Error('Point is not on the curve')
+    if (!ecc.isPublicKey(X)) throw new TypeError('Point is not on the curve')
     hd = new BIP32(null, X, chainCode, network)
   }
 
@@ -122,25 +124,22 @@ BIP32.prototype.getNetwork = function () {
   return this.network
 }
 
-BIP32.prototype.getPublicKey = function () {
+BIP32.prototype.getPublicKeyBuffer = function () {
   return this.Q
 }
 
 BIP32.prototype.neutered = function () {
-  var neutered = new BIP32(null, this.Q, this.chainCode, this.network)
+  let neutered = new BIP32(null, this.Q, this.chainCode, this.network)
   neutered.depth = this.depth
   neutered.index = this.index
   neutered.parentFingerprint = this.parentFingerprint
   return neutered
 }
 
-BIP32.prototype.toBase58 = function (__isPrivate) {
-  if (__isPrivate !== undefined) throw new TypeError('Unsupported argument in 2.0.0')
-
-  // Version
-  var network = this.network
-  var version = (!this.isNeutered()) ? network.bip32.private : network.bip32.public
-  var buffer = Buffer.allocUnsafe(78)
+BIP32.prototype.toBase58 = function () {
+  let network = this.network
+  let version = (!this.isNeutered()) ? network.bip32.private : network.bip32.public
+  let buffer = Buffer.allocUnsafe(78)
 
   // 4 bytes: version bytes
   buffer.writeUInt32BE(version, 0)
@@ -178,14 +177,14 @@ BIP32.prototype.toWIF = function () {
   return wif.encode(this.network.wif, this.d, true)
 }
 
-var HIGHEST_BIT = 0x80000000
+let HIGHEST_BIT = 0x80000000
 
 // https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki#child-key-derivation-ckd-functions
 BIP32.prototype.derive = function (index) {
   typeforce(typeforce.UInt32, index)
 
-  var isHardened = index >= HIGHEST_BIT
-  var data = Buffer.allocUnsafe(37)
+  let isHardened = index >= HIGHEST_BIT
+  let data = Buffer.allocUnsafe(37)
 
   // Hardened child
   if (isHardened) {
@@ -204,21 +203,21 @@ BIP32.prototype.derive = function (index) {
     data.writeUInt32BE(index, 33)
   }
 
-  var I = createHmac('sha512', this.chainCode).update(data).digest()
-  var IL = I.slice(0, 32)
-  var IR = I.slice(32)
+  let I = createHmac('sha512', this.chainCode).update(data).digest()
+  let IL = I.slice(0, 32)
+  let IR = I.slice(32)
 
   // if parse256(IL) >= n, proceed with the next value for i
-  if (!ecc.intVerify(IL)) return this.derive(index + 1)
+  if (!ecc.isPrivateKey(IL)) return this.derive(index + 1)
 
   // Private parent key -> private child key
-  var hd
+  let hd
   if (!this.isNeutered()) {
     // ki = parse256(IL) + kpar (mod n)
-    var ki = ecc.intAdd(IL, this.d)
+    let ki = ecc.privateAdd(this.d, IL)
 
     // In case ki == 0, proceed with the next value for i
-    if (ecc.intIsZero(ki)) return this.derive(index + 1)
+    if (ki == null) return this.derive(index + 1)
 
     hd = new BIP32(ki, null, IR, this.network)
 
@@ -226,7 +225,7 @@ BIP32.prototype.derive = function (index) {
   } else {
     // Ki = point(parse256(IL)) + Kpar
     //    = G*IL + Kpar
-    var Ki = ecc.pointAddTweak(this.Q, IL, true)
+    let Ki = ecc.publicAdd(this.Q, IL, true)
 
     // In case Ki is the point at infinity, proceed with the next value for i
     if (Ki === null) return this.derive(index + 1)
@@ -240,7 +239,7 @@ BIP32.prototype.derive = function (index) {
   return hd
 }
 
-var UINT31_MAX = Math.pow(2, 31) - 1
+let UINT31_MAX = Math.pow(2, 31) - 1
 function UInt31 (value) {
   return typeforce.UInt32(value) && value <= UINT31_MAX
 }
@@ -258,22 +257,22 @@ BIP32.prototype.isNeutered = function () {
   return this.d === null
 }
 
-function BIP32Path (value) {
+function isBIP32Path (value) {
   return typeforce.String(value) && value.match(/^(m\/)?(\d+'?\/)*\d+'?$/)
 }
 
 BIP32.prototype.derivePath = function (path) {
-  typeforce(BIP32Path, path)
+  typeforce(isBIP32Path, path)
 
-  var splitPath = path.split('/')
+  let splitPath = path.split('/')
   if (splitPath[0] === 'm') {
-    if (this.parentFingerprint) throw new Error('Expected master, got child')
+    if (this.parentFingerprint) throw new TypeError('Expected master, got child')
 
     splitPath = splitPath.slice(1)
   }
 
   return splitPath.reduce(function (prevHd, indexStr) {
-    var index
+    let index
     if (indexStr.slice(-1) === "'") {
       index = parseInt(indexStr.slice(0, -1), 10)
       return prevHd.deriveHardened(index)
@@ -285,11 +284,11 @@ BIP32.prototype.derivePath = function (path) {
 }
 
 BIP32.prototype.sign = function (hash) {
-  return ecc.ecdsaSign(hash, this.d)
+  return ecc.sign(hash, this.d)
 }
 
 BIP32.prototype.verify = function (hash, signature) {
-  return ecc.ecdsaVerify(hash, signature, this.Q)
+  return ecc.verify(hash, signature, this.Q)
 }
 
 module.exports = {
