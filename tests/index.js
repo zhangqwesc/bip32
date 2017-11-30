@@ -1,6 +1,6 @@
 let BIP32 = require('../')
 let tape = require('tape')
-let fixtures = require('./fixtures')
+let fixtures = require('./fixtures/index.json')
 let LITECOIN = {
   wif: 0xb0,
   bip32: {
