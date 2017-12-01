@@ -1,3 +1,8 @@
+# 0.11.0
+* changes `discoverChain` to use a map lookup rather than array ieration
+
+# 0.10.0
+
 # 0.9.0
 * add `Account.prototype.derive(address, parents)`
 * removes `Account.prototype.getChildrenMap`, replaced with `.derive`
