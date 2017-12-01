@@ -1,7 +1,5 @@
 # 0.11.0
-* changes `discoverChain` to use a map lookup rather than array ieration
-
-# 0.10.0
+* changes `discoverChain` `queryCb` requirement to return an object, not Array
 
 # 0.9.0
 * add `Account.prototype.derive(address, parents)`
