@@ -104,16 +104,14 @@ function fromBase58 (string, network) {
   return hd
 }
 
-function ripemd160 (buffer) {
-  return createHash('rmd160').update(buffer).digest()
-}
-
-function sha256 (buffer) {
-  return createHash('sha256').update(buffer).digest()
+function hash160 (buffer) {
+  return createHash('rmd160').update(
+    createHash('sha256').update(buffer).digest()
+  ).digest()
 }
 
 BIP32.prototype.getIdentifier = function () {
-  return ripemd160(sha256(this.Q))
+  return hash160(this.Q)
 }
 
 BIP32.prototype.getFingerprint = function () {
