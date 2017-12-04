@@ -16,29 +16,22 @@ let child = node.derivePath('m/0/0')
 
 #### bip32.Account
 ``` javascript
-var bitcoin = require('bitcoinjs-lib')
-var bip32 = require('bip32')
-var bip39 = require('bip39')
+let bitcoin = require('bitcoinjs-lib')
+let bip32 = require('bip32')
+let bip39 = require('bip39')
 
 // ...
 
 let mnemonic = bip39.generateMnemonic()
 let seed = bip39.mnemonicToSeed(mnemonic)
-var m = bip32.fromSeed(seed)
-var i = m.deriveHardened(0)
-var external = i.derive(0)
-var internal = i.derive(1)
-var account = new bip32.Account([
-  new bip32.Chain(external.neutered()),
-  new bip32.Chain(internal.neutered())
-])
+let account = bip32.Account.standardFromSeed(seed)
 
 console.log(account.getChainAddress(0))
 // => 1QEj2WQD9vxTzsGEvnmLpvzeLVrpzyKkGt
 
 account.nextChainAddress(0)
 
-console.log(account.getChainAddress(1))
+console.log(account.getChainAddress(0))
 // => 1DAi282VN7Ack9o5BqWYkiEsS8Vgx1rLn
 
 console.log(account.getChainAddress(1))
@@ -53,19 +46,30 @@ console.log(account.derive('1QEj2WQD9vxTzsGEvnmLpvzeLVrpzyKkGt', [external, inte
 // => xprv9vodQPEygdPGUWeKUVNd6M2N533PvEYP21tYxznauyhrYBBCmdKxRJzmnsTsSNqfTJPrDF98GbLCm6xRnjceZ238Qkf5GQGHk79CrFqtG4d
 ```
 
+##### BIP44
+```
+// ...
+
+// equivalent to /44'/0'/0'
+let account = bip32.Account.bip44FromSeed(seed, 44, 0, 0)
+
+// ...
+```
+
+
 #### bip32.Chain
 ``` javascript
-var bitcoin = require('bitcoinjs-lib')
-var bip32 = require('bip32')
+let bitcoin = require('bitcoinjs-lib')
+let bip32 = require('bip32')
 
 // ...
 
-var hdNode = bitcoin.HDNode.fromSeedHex(seedHex)
-var chain = new bip32.Chain(hdNode)
+let hdNode = bitcoin.HDNode.fromSeedHex(seedHex)
+let chain = new bip32.Chain(hdNode)
 
-for (var k = 0; k < 10; ++k) chain.next()
+for (let k = 0; k < 10; ++k) chain.next()
 
-var address = chain.get()
+let address = chain.get()
 
 console.log(chain.find(address))
 // => 9

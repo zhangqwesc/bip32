@@ -1,17 +1,17 @@
-var bitcoinjs = require('bitcoinjs-lib')
-var discovery = require('./discovery')
+let bip32 = require('./')
+let discovery = require('./discovery')
 
-var Chain = require('./chain')
+let Chain = require('./chain')
 
 function Account (chains) {
   this.chains = chains
 }
 
 Account.fromJSON = function (json, network, addressFunction) {
-  var chains = json.map(function (j) {
-    var node = bitcoinjs.HDNode.fromBase58(j.node, network)
+  let chains = json.map(function (j) {
+    let node = bip32.fromBase58(j.node, network)
 
-    var chain = new Chain(node, j.k, addressFunction)
+    let chain = new Chain(node, j.k, addressFunction)
     chain.map = j.map
 
     // derive from k map
@@ -23,6 +23,37 @@ Account.fromJSON = function (json, network, addressFunction) {
   })
 
   return new Account(chains)
+}
+
+Account.fromNode = function (node, options) {
+  options = options || {}
+  let chainCount = options.chains || 2
+  let neuter = options.neuter === undefined ? true : options.neuter
+
+  if (neuter) node = node.neutered()
+
+  let chains = []
+  for (let j = 0; j < chainCount; ++j) {
+    chains.push(new Chain(node.derive(j)))
+  }
+
+  return new Account(chains)
+}
+
+Account.standardFromSeed = function (seed, i, options) {
+  let account = bip32.fromSeed(seed)
+    .deriveHardened(i)
+
+  return Account.fromNode(account, options)
+}
+
+Account.bip44FromSeed = function (seed, purpose, coinType, i, options) {
+  let account = bip32.fromSeed(seed)
+    .deriveHardened(purpose)
+    .deriveHardened(coinType)
+    .deriveHardened(i)
+
+  return Account.fromNode(account, options)
 }
 
 Account.prototype.clone = function () {
@@ -39,7 +70,7 @@ Account.prototype.containsAddress = function (address) {
 
 // optional parents argument for private key escalation
 Account.prototype.derive = function (address, parents) {
-  var derived
+  let derived
 
   this.chains.some(function (chain, i) {
     derived = chain.derive(address, parents && parents[i])
@@ -50,15 +81,15 @@ Account.prototype.derive = function (address, parents) {
 }
 
 Account.prototype.discoverChain = function (i, gapLimit, queryCallback, callback) {
-  var chains = this.chains
-  var chain = chains[i].clone()
+  let chains = this.chains
+  let chain = chains[i].clone()
 
   discovery(chain, gapLimit, queryCallback, function (err, used, checked) {
     if (err) return callback(err)
 
     // throw away EACH unused address AFTER the last unused address
-    var unused = checked - used
-    for (var j = 1; j < unused; ++j) chain.pop()
+    let unused = checked - used
+    for (let j = 1; j < unused; ++j) chain.pop()
 
     // override the internal chain
     chains[i] = chain

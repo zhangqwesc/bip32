@@ -1,5 +1,8 @@
+let base58check = require('bs58check')
+let crypto = require('./crypto')
+
 function DEFAULT_ADDRESS_FUNCTION (node) {
-  return node.getAddress()
+  return crypto.hash160(node.getPublicKeyBuffer())
 }
 
 function Chain (parent, k, addressFunction) {
@@ -13,22 +16,22 @@ function Chain (parent, k, addressFunction) {
 }
 
 Chain.prototype.__initialize = function () {
-  var address = this.addressFunction(this.__parent.derive(this.k))
+  let address = this.addressFunction(this.__parent.derive(this.k))
   this.map[address] = this.k
   this.addresses.push(address)
 }
 
 Chain.prototype.clone = function () {
-  var chain = new Chain(this.__parent, this.k, this.addressFunction)
+  let chain = new Chain(this.__parent, this.k, this.addressFunction)
 
   chain.addresses = this.addresses.concat()
-  for (var s in this.map) chain.map[s] = this.map[s]
+  for (let s in this.map) chain.map[s] = this.map[s]
 
   return chain
 }
 
 Chain.prototype.derive = function (address, parent) {
-  var k = this.map[address]
+  let k = this.map[address]
   if (k === undefined) return
 
   parent = parent || this.__parent
@@ -57,7 +60,7 @@ Chain.prototype.getParent = function () {
 
 Chain.prototype.next = function () {
   if (this.addresses.length === 0) this.__initialize()
-  var address = this.addressFunction(this.__parent.derive(this.k + 1))
+  let address = this.addressFunction(this.__parent.derive(this.k + 1))
 
   this.k += 1
   this.map[address] = this.k
@@ -67,7 +70,7 @@ Chain.prototype.next = function () {
 }
 
 Chain.prototype.pop = function () {
-  var address = this.addresses.pop()
+  let address = this.addresses.pop()
   delete this.map[address]
   this.k -= 1
 

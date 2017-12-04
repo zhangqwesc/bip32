@@ -1,7 +1,6 @@
 let Buffer = require('safe-buffer').Buffer
 let base58check = require('bs58check')
-let createHash = require('create-hash')
-let createHmac = require('create-hmac')
+let crypto = require('./crypto')
 let ecc = require('./ecc')
 let typeforce = require('typeforce')
 let wif = require('wif')
@@ -41,7 +40,7 @@ function fromSeed (seed, network) {
   if (network) typeforce(NETWORK_TYPE, network)
   network = network || BITCOIN
 
-  let I = createHmac('sha512', 'Bitcoin seed').update(seed).digest()
+  let I = crypto.hmacSHA512('Bitcoin seed', seed)
   let IL = I.slice(0, 32)
   let IR = I.slice(32)
 
@@ -104,14 +103,8 @@ function fromBase58 (string, network) {
   return hd
 }
 
-function hash160 (buffer) {
-  return createHash('rmd160').update(
-    createHash('sha256').update(buffer).digest()
-  ).digest()
-}
-
 BIP32.prototype.getIdentifier = function () {
-  return hash160(this.Q)
+  return crypto.hash160(this.Q)
 }
 
 BIP32.prototype.getFingerprint = function () {
@@ -201,7 +194,7 @@ BIP32.prototype.derive = function (index) {
     data.writeUInt32BE(index, 33)
   }
 
-  let I = createHmac('sha512', this.chainCode).update(data).digest()
+  let I = crypto.hmacSHA512(this.chainCode, data)
   let IL = I.slice(0, 32)
   let IR = I.slice(32)
 

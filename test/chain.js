@@ -1,12 +1,12 @@
-var bitcoin = require('bitcoinjs-lib')
-var Chain = require('../chain')
-var test = require('tape')
-var fixtures = require('./fixtures/chain')
-var createKeccakHash = require('keccak')
+let bitcoin = require('bitcoinjs-lib')
+let Chain = require('../chain')
+let test = require('tape')
+let fixtures = require('./fixtures/chain')
+let createKeccakHash = require('keccak')
 
 function segwitAddr (node) {
-  var hash = bitcoin.crypto.hash160(node.getPublicKeyBuffer())
-  var script = bitcoin.script.witnessPubKeyHash.output.encode(hash)
+  let hash = bitcoin.crypto.hash160(node.getPublicKeyBuffer())
+  let script = bitcoin.script.witnessPubKeyHash.output.encode(hash)
   return bitcoin.address.fromOutputScript(script)
 }
 
@@ -16,17 +16,17 @@ function ethAddr (node) {
     .digest().toString('hex')
 }
 
-var AF_MAPPING = {
+let AF_MAPPING = {
   'eth': ethAddr,
   'segwit': segwitAddr
 }
 
 fixtures.forEach(function (f) {
-  var node = bitcoin.HDNode.fromBase58(f.node)
-  var addressFunction = AF_MAPPING[f.addressFunction]
+  let node = bitcoin.HDNode.fromBase58(f.node)
+  let addressFunction = AF_MAPPING[f.addressFunction]
 
   test('constructor', function (t) {
-    var chain = new Chain(node, null, addressFunction)
+    let chain = new Chain(node, null, addressFunction)
 
     t.plan(3)
     t.equal(chain.k, 0, 'defaults to k=0')
@@ -39,8 +39,8 @@ fixtures.forEach(function (f) {
   })
 
   test('clone', function (t) {
-    var chain = new Chain(node, null, addressFunction)
-    var clone = chain.clone()
+    let chain = new Chain(node, null, addressFunction)
+    let clone = chain.clone()
 
     t.plan(17)
 
@@ -55,7 +55,7 @@ fixtures.forEach(function (f) {
     t.same(chain.map, clone.map, 'k map is deep copied')
     t.same(chain.addressFunction, clone.addressFunction, 'address function is copied')
 
-    for (var i = 0; i < 7; ++i) chain.next()
+    for (let i = 0; i < 7; ++i) chain.next()
     t.equal(clone.k, 0, 'k unchanged by mutation')
     t.notEqual(chain.k, clone.k, 'k unchanged by mutation (2)')
     t.notSame(chain.addresses, clone.addresses, 'address array unchanged by mutation')
@@ -74,12 +74,12 @@ fixtures.forEach(function (f) {
   })
 
   test('find/derive', function (t) {
-    var neutered = node.neutered()
-    var chain = new Chain(neutered, f.k, addressFunction)
+    let neutered = node.neutered()
+    let chain = new Chain(neutered, f.k, addressFunction)
 
     t.plan(30)
-    for (var i = 0; i < 10; ++i) {
-      var address = chain.get()
+    for (let i = 0; i < 10; ++i) {
+      let address = chain.get()
 
       t.equal(chain.find(address), f.k + i)
       t.same(chain.derive(address), neutered.derive(f.k + i))
@@ -89,7 +89,7 @@ fixtures.forEach(function (f) {
   })
 
   test('get', function (t) {
-    var chain = new Chain(node, f.k, addressFunction)
+    let chain = new Chain(node, f.k, addressFunction)
     chain.addresses = f.addresses
 
     t.plan(1)
@@ -97,7 +97,7 @@ fixtures.forEach(function (f) {
   })
 
   test('next', function (t) {
-    var chain = new Chain(node, f.k - f.addresses.length + 1, addressFunction)
+    let chain = new Chain(node, f.k - f.addresses.length + 1, addressFunction)
 
     t.plan(f.addresses.length * 2 + 1)
     f.addresses.forEach(function (x, i) {
@@ -113,10 +113,10 @@ fixtures.forEach(function (f) {
   })
 
   test('pop', function (t) {
-    var chain = new Chain(node, null, addressFunction)
+    let chain = new Chain(node, null, addressFunction)
     chain.next()
     chain.next()
-    var addresses = chain.getAll().concat()
+    let addresses = chain.getAll().concat()
 
     t.plan(8)
     t.equal(chain.getAll().length, 3, 'has 3 addresses')
