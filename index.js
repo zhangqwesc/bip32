@@ -1,5 +1,5 @@
 let Buffer = require('safe-buffer').Buffer
-let base58check = require('bs58check')
+let bs58check = require('bs58check')
 let crypto = require('./crypto')
 let ecc = require('./ecc')
 let typeforce = require('typeforce')
@@ -14,11 +14,11 @@ let NETWORK_TYPE = typeforce.compile({
 })
 
 let BITCOIN = {
-  wif: 0x80,
   bip32: {
     public: 0x0488b21e,
     private: 0x0488ade4
-  }
+  },
+  wif: 0x80
 }
 
 function BIP32 (d, Q, chainCode, network) {
@@ -51,7 +51,7 @@ function fromSeed (seed, network) {
 }
 
 function fromBase58 (string, network) {
-  let buffer = base58check.decode(string)
+  let buffer = bs58check.decode(string)
   if (buffer.length !== 78) throw new TypeError('Invalid buffer length')
   if (network) typeforce(NETWORK_TYPE, network)
   network = network || BITCOIN
@@ -160,7 +160,7 @@ BIP32.prototype.toBase58 = function () {
     this.Q.copy(buffer, 45)
   }
 
-  return base58check.encode(buffer)
+  return bs58check.encode(buffer)
 }
 
 BIP32.prototype.toWIF = function () {

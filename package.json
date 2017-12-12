@@ -1,15 +1,9 @@
 {
   "name": "bip32",
-  "version": "0.11.0",
+  "version": "0.99.0",
   "description": "",
   "keywords": [
     "bip32",
-    "bip44",
-    "bip49",
-    "account",
-    "chain",
-    "discovery",
-    "gap",
     "bitcoinjs",
     "bitcoin",
     "secp256k1"
